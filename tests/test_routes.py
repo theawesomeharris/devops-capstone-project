@@ -124,3 +124,87 @@ class TestAccountService(TestCase):
         self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
 
     # ADD YOUR TEST CASES HERE ...
+
+    def test_list_accounts(self):
+        """It should get a list of Accounts"""
+        self._create_accounts(5)
+        response = self.client.get(BASE_URL, content_type="application/json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 5)
+
+    def test_list_no_accounts(self):
+        """It should return an empty list if no Account exists"""
+        response = self.client.get(BASE_URL, content_type="application/json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(data, [])
+
+    def test_get_account(self):
+        """It should Get a single Account"""
+        account = self._create_accounts(1)[0]   # get the id of an account
+        response = self.client.get(f"{BASE_URL}/{account.id}", content_type="application/json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(data["id"], account.id)
+
+    def test_account_not_found(self):
+        """It should return 404 when account is not found"""
+        response = self.client.get(f"{BASE_URL}/0", content_type="application/json")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_update_an_account(self):
+        """It should Update a single Account"""
+        account = self._create_accounts(1)[0]
+        response = self.client.get(f"{BASE_URL}/{account.id}", content_type="application/json")
+        response_json = response.get_json()
+        response_json['email'] = 'anewemail@gmail.com'
+        self.assertNotEqual(response.get_json()['email'], response_json['email'])
+
+        put_response = self.client.put(f"{BASE_URL}/{account.id}", json=response_json)
+        self.assertEqual(put_response.status_code, status.HTTP_200_OK)
+
+        updated_response = self.client.get(f"{BASE_URL}/{account.id}", content_type="application/json")
+        self.assertEqual(response_json['email'], updated_response.get_json()['email'])
+
+    def test_update_nonexistent_product(self):
+        """It should return 404 NOT FOUND for a non-existent Account"""
+        response = self.client.put(f"{BASE_URL}/9999", json={"name": "new desc"})
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_update_account_invalid_data(self):
+        """It should return 400 BAD REQUEST for invalid data format"""
+        test_account = AccountFactory()
+        response = self.client.post(BASE_URL, json=test_account.serialize())
+        account = response.get_json()
+
+        # Attempt to update with invalid data
+        response = self.client.put(f"{BASE_URL}/{account['id']}", json={"name": 12345})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_delete_an_account(self):
+        """It should Delete a single Account"""
+        accounts = self._create_accounts(5)
+        account_count = self.get_account_count()
+        test_account = accounts[0]
+        response = self.client.delete(f"{BASE_URL}/{test_account.id}")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(len(response.data), 0)
+
+        # make sure they are deleted
+        response = self.client.get(f"{BASE_URL}/{test_account.id}")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        new_count = self.get_account_count()
+        self.assertEqual(new_count, account_count - 1)
+
+    ######################################################################
+    # Utility functions
+    ######################################################################
+
+    def get_account_count(self):
+        """save the current number of accounts"""
+        response = self.client.get(BASE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        # logging.debug("data = %s", data)
+        return len(data)
