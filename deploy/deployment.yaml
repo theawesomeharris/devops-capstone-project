@@ -6,6 +6,11 @@ metadata:
     app: accounts
   name: accounts
 spec:
+  template:
+    spec:
+      containers:
+      - image: IMAGE_NAME_HERE
+        name: accounts
   replicas: 3
   selector:
     matchLabels:
